@@ -2,11 +2,11 @@ unsigned int maxDimmer = 7250;
 unsigned int minDimmer = 1000;
 unsigned int dimmerValue = maxDimmer;
 const int AC_IN_ZERO = 2;
-const int TRIAC = 8;
+const int TRIAC = 10;
 volatile unsigned long deltaTime = 0;
 
-int REL1 = 9;
-int REL2 = 10;
+int REL1 = 11;
+int REL2 = 12;
 
 void setup() {
   Serial.begin(9600);  // Iniciar comunicación serie
@@ -26,7 +26,7 @@ void setup() {
 void loop() {
   // Verifica si hay datos disponibles
   if (Serial.available()) {
-    // Leer dirección (0 o 1)
+    // Leer dirección (1 o 2)
     int direction = Serial.parseInt();
 
     if (direction == 1 || direction == 2) {
@@ -43,9 +43,7 @@ void loop() {
       }
 
       // Esperar al segundo valor (velocidad)
-      while (!Serial.available()) {
-        // Esperar a que llegue el siguiente valor
-      }
+      while (!Serial.available());
 
       unsigned int val = Serial.parseInt();
       if (val < 100 && val > 0) {
@@ -54,7 +52,7 @@ void loop() {
         Serial.println(val);
       }
     } else {
-      Serial.println("Dirección inválida. Debe ser 0 o 1.");
+      Serial.println("Dirección inválida. Debe ser 1 o 2.");
     }
   }
 }
