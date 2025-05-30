@@ -24,10 +24,37 @@ void setup() {
 }
 
 void loop() {
+  // Verifica si hay datos disponibles
   if (Serial.available()) {
-    unsigned int val = Serial.parseInt();
-    if (val < 100 and val > 0) {
-      dimmerValue = map(val,0,100,maxDimmer,minDimmer);
+    // Leer dirección (0 o 1)
+    int direction = Serial.parseInt();
+
+    if (direction == 1 || direction == 2) {
+      // Aquí defines el sentido de giro con base en la dirección recibida
+      // Por ejemplo: digitalWrite(DIR_PIN, direction);
+      Serial.print("Dirección recibida: ");
+      Serial.println(direction);
+      if (direction == 1) {
+        digitalWrite(REL1, LOW);
+        digitalWrite(REL2, LOW);
+      } else if(direction == 2) {
+        digitalWrite(REL1, HIGH);
+        digitalWrite(REL2, HIGH);
+      }
+
+      // Esperar al segundo valor (velocidad)
+      while (!Serial.available()) {
+        // Esperar a que llegue el siguiente valor
+      }
+
+      unsigned int val = Serial.parseInt();
+      if (val < 100 && val > 0) {
+        dimmerValue = map(val, 0, 100, maxDimmer, minDimmer);
+        Serial.print("Velocidad recibida: ");
+        Serial.println(val);
+      }
+    } else {
+      Serial.println("Dirección inválida. Debe ser 0 o 1.");
     }
   }
 }
