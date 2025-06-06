@@ -5,8 +5,8 @@ const int AC_IN_ZERO = 2;
 const int TRIAC = 10;
 volatile unsigned long deltaTime = 0;
 
-int REL1 = 11;
-int REL2 = 12;
+int REL1 = 8;
+int REL2 = 9;
 
 void setup() {
   Serial.begin(9600);  // Iniciar comunicación serie
