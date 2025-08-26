@@ -20,6 +20,15 @@ int inputSpeed = 0;         // No default speed
 float targetAngle = 0.0;    // No default target angle
 bool parametersSet = false; // Flag to track if parameters have been set
 
+// Motor direction tracking for safety
+enum MotorDirection {
+  MOTOR_STOPPED,
+  MOTOR_FORWARD,
+  MOTOR_BACKWARD
+};
+
+MotorDirection currentDirection = MOTOR_STOPPED;
+
 
 void setup() {
   Serial.begin(9600);
@@ -85,24 +94,38 @@ void printAngleStatus(float angle, String motorStatus) {
   Serial.println(motorStatus);
 }
 
-// Motor control functions
+// Safe motor control functions with direction tracking
 void motorForward(int speed, float angle) {
+  if (currentDirection == MOTOR_BACKWARD) {
+    // Stop motor first if changing from backward to forward
+    motorStop(angle);
+  }
+  
   analogWrite(RPWM_PIN, speed);  // PWM speed (0-255)
   analogWrite(LPWM_PIN, 0);      // Stop reverse
+  currentDirection = MOTOR_FORWARD;
   printAngleStatus(angle, "Motor Forward");
 }
 
 void motorBackward(int speed, float angle) {
+  if (currentDirection == MOTOR_FORWARD) {
+    // Stop motor first if changing from forward to backward
+    motorStop(angle);
+  }
+  
   analogWrite(RPWM_PIN, 0);      // Stop forward
   analogWrite(LPWM_PIN, speed);  // PWM speed (0-255)
+  currentDirection = MOTOR_BACKWARD;
   printAngleStatus(angle, "Motor Backward");
 }
 
 void motorStop(float angle) {
   analogWrite(RPWM_PIN, 0);
   analogWrite(LPWM_PIN, 0);
+  currentDirection = MOTOR_STOPPED;
   printAngleStatus(angle, "Motor Stop");
-  delay(500);
+  //delay(500);
+  delay(2000);
 }
 
 // Function to position motor based on current and target angles
