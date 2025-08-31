@@ -13,6 +13,13 @@ int inputSpeed = 0;         // No default speed
 float targetAngle = 0.0;    // No default target angle
 bool parametersSet = false; // Flag to track if parameters have been set
 
+// Global variables for potentiometer reading (shared between tasks)
+volatile float currentAngle = 0.0;
+
+// Timing variable for periodic printing
+unsigned long lastPrintTime = 0;
+
+
 // Motor direction tracking for safety
 enum MotorDirection {
   MOTOR_STOPPED,
@@ -46,13 +53,25 @@ void setup() {
   // Initial positioning - move motor to 90 degrees
   delay(1000); // Wait for system to stabilize
 
+  // Create FreeRTOS task for potentiometer reading
+  xTaskCreate(
+    potentiometerTask,    // Task function
+    "PotReader",          // Task name
+    2048,                 // Stack size
+    NULL,                 // Parameters
+    1,                    // Priority
+    NULL                  // Task handle
+  );
+
+  
+  targetAngle = 90;
   while (true) {
     // Read potentiometer value (0-4095) and convert to angle (0-180)
     int potValue = analogRead(POT_PIN);
-    float currentAngle = map(potValue, 0, 4095, 0, 180);
+    //float currentAngle = map(potValue, 0, 4095, 0, 180);
 
     // Position motor to 90 degrees (center of 85-95 range)
-    positionMotor(currentAngle, 90.0, 80); // Use moderate speed for initial positioning
+    positionMotor( 80); // Use moderate speed for initial positioning
 
     // Check if we're in the target range
     if (currentAngle >= 85.0 && currentAngle <= 95.0) {
@@ -65,6 +84,54 @@ void setup() {
   }
 
   Serial.println("Motor stopped - waiting for input (format: speed,angle)");
+  
+}
+
+
+void loop() {
+  
+  // Check for serial input
+  if (Serial.available() > 0) {
+    String input = Serial.readStringUntil('\n');
+    input.trim();
+
+    // Parse input format: "speed,angle" (e.g., "100,45")
+    int commaIndex = input.indexOf(',');
+    if (commaIndex > 0) {
+      inputSpeed = input.substring(0, commaIndex).toInt();
+      targetAngle = input.substring(commaIndex + 1).toFloat();
+      parametersSet = true; // Mark that parameters have been set
+
+      Serial.print("New settings - Speed: ");
+      Serial.print(inputSpeed);
+      Serial.print(", Target Angle: ");
+      Serial.println(targetAngle);
+    }
+  }
+
+  // Only move motor if we have valid potentiometer reading and parameters are set
+  if (parametersSet) {
+    positionMotor( inputSpeed);
+  } else {
+    // Keep motor stopped until parameters are set
+    analogWrite(RPWM_PIN, 0);
+    analogWrite(LPWM_PIN, 0);
+  }
+  
+  
+  // Print current position every second
+  unsigned long currentTime = millis();
+  if (currentTime - lastPrintTime >= 300) {
+    Serial.print("Current Position: ");
+    Serial.print(currentAngle);
+    Serial.println(" degrees");
+    lastPrintTime = currentTime;
+  }
+  
+
+  delay(10);
+  
+
 }
 
 // Function to print angle and motor status
@@ -105,12 +172,12 @@ void motorStop(float angle) {
   analogWrite(LPWM_PIN, 0);
   currentDirection = MOTOR_STOPPED;
   printAngleStatus(angle, "Motor Stop");
-  //delay(500);
+
   delay(500);//ATENTION!!! time to stop , to prevent damages!
 }
 
 // Function to position motor based on current and target angles
-void positionMotor(float currentAngle, float targetAngle, int speed) {
+void positionMotor( int speed) {
   float angleDifference = currentAngle - targetAngle;
 
   if (abs(angleDifference) <= 5.0) {
@@ -128,45 +195,30 @@ void positionMotor(float currentAngle, float targetAngle, int speed) {
   }
 }
 
-
-
-void loop() {
-  // Check for serial input
-  if (Serial.available() > 0) {
-    String input = Serial.readStringUntil('\n');
-    input.trim();
-
-    // Parse input format: "speed,angle" (e.g., "100,45")
-    int commaIndex = input.indexOf(',');
-    if (commaIndex > 0) {
-      inputSpeed = input.substring(0, commaIndex).toInt();
-      targetAngle = input.substring(commaIndex + 1).toFloat();
-      parametersSet = true; // Mark that parameters have been set
-
-      Serial.print("New settings - Speed: ");
-      Serial.print(inputSpeed);
-      Serial.print(", Target Angle: ");
-      Serial.println(targetAngle);
+// FreeRTOS task for continuous potentiometer reading
+void potentiometerTask(void *parameter) {
+  volatile float currentAngleTmp = 0.0;
+  while (true) {
+    // Get current time in milliseconds
+    unsigned long readTime = millis();
+    
+    // Read potentiometer value (0-4095) and convert to angle (0-180)
+    int potValue = analogRead(POT_PIN);
+    currentAngleTmp = map(potValue, 0, 4095, 0, 180);
+    
+    if (currentAngleTmp  == 0) {
+      // Invalid reading, don't update
+      
+    } else {
+      currentAngle = currentAngleTmp;
+      /*
+      Serial.print("Time: ");
+      Serial.print(readTime);
+      Serial.print("ms - Current Angle: ");
+      Serial.println(currentAngle);
+      */
     }
+    
+    vTaskDelay(30 / portTICK_PERIOD_MS); // 5ms delay for high-frequency reading
   }
-
-  // Read potentiometer value (0-4095) and convert to angle (0-180)
-  int potValue = analogRead(POT_PIN);
-  float currentAngle = map(potValue, 0, 4095, 0, 180);
-
-  // Print current angle on each reading
-  Serial.print("Current Angle: ");
-  Serial.println(currentAngle);
-
-  // Only move motor if parameters have been set via serial input
-  if (parametersSet) {
-    positionMotor(currentAngle, targetAngle, inputSpeed);
-  } else {
-    // Keep motor stopped until parameters are set
-    analogWrite(RPWM_PIN, 0);
-    analogWrite(LPWM_PIN, 0);
-  }
-
-  delay(10);
-
 }
