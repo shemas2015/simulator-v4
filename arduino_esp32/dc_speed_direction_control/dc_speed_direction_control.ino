@@ -1,12 +1,5 @@
-#include <Wire.h>
-
-// MPU6050 I2C address
-#define MPU6050_ADDR 0x68
-
-// MPU6050 register addresses
-#define PWR_MGMT_1   0x6B
-#define ACCEL_XOUT_H 0x3B
-#define GYRO_XOUT_H  0x43
+// Potentiometer pin
+#define POT_PIN 34
 
 // IBT-2 Motor Driver pins
 #define RPWM_PIN 25  // Right PWM (forward)
@@ -32,13 +25,6 @@ MotorDirection currentDirection = MOTOR_STOPPED;
 
 void setup() {
   Serial.begin(9600);
-  Wire.begin();
-
-  // Initialize MPU6050
-  Wire.beginTransmission(MPU6050_ADDR);
-  Wire.write(PWR_MGMT_1);
-  Wire.write(0); // Wake up the MPU6050
-  Wire.endTransmission(true);
 
   // Initialize IBT-2 pins
   pinMode(RPWM_PIN, OUTPUT);
@@ -54,21 +40,16 @@ void setup() {
   analogWrite(RPWM_PIN, 0);
   analogWrite(LPWM_PIN, 0);
 
-  Serial.println("MPU6050 and IBT-2 initialized");
+  Serial.println("Potentiometer and IBT-2 initialized");
   Serial.println("Moving to initial position (85-95 degrees)...");
 
-  // Initial positioning - move motor to between 85-95 degrees
-  delay(1000); // Wait for MPU6050 to stabilize
+  // Initial positioning - move motor to 90 degrees
+  delay(1000); // Wait for system to stabilize
 
   while (true) {
-    // Read accelerometer data
-    int16_t accelX = readMPU6050(ACCEL_XOUT_H);
-    int16_t accelY = readMPU6050(ACCEL_XOUT_H + 2);
-    int16_t accelZ = readMPU6050(ACCEL_XOUT_H + 4);
-
-    // Calculate current angle
-    float currentAngle = atan2(-accelX, sqrt(accelY * accelY + accelZ * accelZ)) * 180.0 / PI;
-    currentAngle += 90;
+    // Read potentiometer value (0-4095) and convert to angle (0-180)
+    int potValue = analogRead(POT_PIN);
+    float currentAngle = map(potValue, 0, 4095, 0, 180);
 
     // Position motor to 90 degrees (center of 85-95 range)
     positionMotor(currentAngle, 90.0, 80); // Use moderate speed for initial positioning
@@ -132,7 +113,7 @@ void motorStop(float angle) {
 void positionMotor(float currentAngle, float targetAngle, int speed) {
   float angleDifference = currentAngle - targetAngle;
 
-  if (abs(angleDifference) <= 10.0) {
+  if (abs(angleDifference) <= 5.0) {
     // Within ±5 degrees of target - stop motor
     motorStop(currentAngle);
     parametersSet = false;
@@ -169,16 +150,9 @@ void loop() {
     }
   }
 
-  // Read accelerometer data
-  int16_t accelX = readMPU6050(ACCEL_XOUT_H);
-  int16_t accelY = readMPU6050(ACCEL_XOUT_H + 2);
-  int16_t accelZ = readMPU6050(ACCEL_XOUT_H + 4);
-
-  // Calculate tilt angle in degrees (horizontal axis)
-  float currentAngle = atan2(-accelX, sqrt(accelY * accelY + accelZ * accelZ)) * 180.0 / PI;
-
-  // Add 90 degrees to make 0 degrees horizontal
-  currentAngle += 90;
+  // Read potentiometer value (0-4095) and convert to angle (0-180)
+  int potValue = analogRead(POT_PIN);
+  float currentAngle = map(potValue, 0, 4095, 0, 180);
 
   // Print current angle on each reading
   Serial.print("Current Angle: ");
@@ -195,14 +169,4 @@ void loop() {
 
   delay(10);
 
-}
-
-int16_t readMPU6050(uint8_t reg) {
-  Wire.beginTransmission(MPU6050_ADDR);
-  Wire.write(reg);
-  Wire.endTransmission(false);
-  Wire.requestFrom(MPU6050_ADDR, 2, true);
-
-  int16_t value = Wire.read() << 8 | Wire.read();
-  return value;
 }
