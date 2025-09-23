@@ -13,121 +13,55 @@ class ArduinoController:
     Manages connection, command sending, and response handling.
     """
 
-    def __init__(self, baudrate: int = 9600, timeout: float = 1.0):
+    def __init__(self, port: str, baudrate: int, timeout: float = 1.0):
         """
         Initialize Arduino controller.
         
         Args:
+            port: Serial port path (e.g., COM3, /dev/ttyUSB0)
             baudrate: Serial communication baud rate
             timeout: Serial communication timeout in seconds
         """
+        self.port = port
         self.baudrate = baudrate
         self.timeout = timeout
         self.connection: Optional[serial.Serial] = None
-        self.port: Optional[str] = None
         self._is_connected = False
+        
+        # Automatically connect on initialization
+        self.connect()
 
-    def get_available_ports(self) -> List[Dict[str, str]]:
+
+    def connect(self) -> bool:
         """
-        Get list of available USB/serial ports that could be Arduino devices.
-        
-        Returns:
-            List of dictionaries with port information
-        """
-        ports = serial.tools.list_ports.comports()
-        available_ports = []
-        
-        for port in ports:
-            # Filter for likely Arduino ports
-            if any(keyword in port.description.lower() for keyword in ['arduino', 'usb', 'serial', 'ch340', 'cp2102']):
-                available_ports.append({
-                    'device': port.device,
-                    'description': port.description,
-                    'hwid': port.hwid
-                })
-        
-        return available_ports
-
-    def list_ports(self) -> None:
-        """Print available ports to console."""
-        ports = self.get_available_ports()
-        
-        if not ports:
-            print("No USB/Serial devices found. Make sure Arduino is connected.")
-            return
-
-        print("\nAvailable USB/Serial devices:")
-        print("-" * 50)
-        
-        for idx, port in enumerate(ports):
-            print(f"{idx + 1}. {port['device']} - {port['description']}")
-
-    def select_port_interactive(self) -> Optional[str]:
-        """
-        Interactive port selection from available devices.
-        
-        Returns:
-            Selected port device path or None if cancelled
-        """
-        ports = self.get_available_ports()
-        
-        if not ports:
-            print("No USB/Serial devices found. Make sure Arduino is connected.")
-            return None
-
-        print("\nAvailable USB/Serial devices:")
-        print("-" * 50)
-        
-        for idx, port in enumerate(ports):
-            print(f"{idx + 1}. {port['device']} - {port['description']}")
-        
-        while True:
-            try:
-                choice = input("\nSelect device number (or 'q' to quit): ").strip()
-                
-                if choice.lower() == 'q':
-                    return None
-                
-                choice_idx = int(choice) - 1
-                if 0 <= choice_idx < len(ports):
-                    return ports[choice_idx]['device']
-                else:
-                    print("Invalid selection. Please try again.")
-            
-            except (ValueError, KeyboardInterrupt):
-                print("\nOperation cancelled.")
-                return None
-
-    def connect(self, port: Optional[str] = None) -> bool:
-        """
-        Connect to Arduino on specified port.
-        
-        Args:
-            port: Serial port path. If None, will prompt for selection
+        Connect to Arduino on the configured port.
             
         Returns:
             True if connection successful, False otherwise
         """
-        if port is None:
-            port = self.select_port_interactive()
-        
-        if not port:
-            return False
-
         try:
-            self.connection = serial.Serial(port, self.baudrate, timeout=self.timeout)
+            self.connection = serial.Serial(self.port, self.baudrate, timeout=self.timeout)
             time.sleep(2)  # Wait for Arduino to reset
             
-            self.port = port
             self._is_connected = True
             
-            logger.info(f"Connected to Arduino on {port} at {self.baudrate} baud")
-            print(f"✓ Connected to Arduino on {port} at {self.baudrate} baud")
+            logger.info(f"Connected to Arduino on {self.port} at {self.baudrate} baud")
+            print(f"✓ Connected to Arduino on {self.port} at {self.baudrate} baud")
             return True
             
         except serial.SerialException as e:
-            logger.error(f"Failed to connect to {port}: {e}")
-            print(f"✗ Failed to connect to {port}: {e}")
+            logger.error(f"Failed to connect to {self.port}: {e}")
+            print(f"✗ Failed to connect to {self.port}: {e}")
+            
+            # Show available ports when connection fails
+            print("\nAvailable ports:")
+            available_ports = serial.tools.list_ports.comports()
+            if available_ports:
+                for port_info in available_ports:
+                    print(f"  {port_info.device} - {port_info.description}")
+            else:
+                print("  No Arduino/USB Serial devices found")
+            
             return False
 
     def disconnect(self) -> None:
@@ -138,7 +72,6 @@ class ArduinoController:
         
         self._is_connected = False
         self.connection = None
-        self.port = None
 
     def is_connected(self) -> bool:
         """
@@ -308,7 +241,7 @@ class ArduinoController:
             'port': self.port,
             'baudrate': self.baudrate,
             'timeout': self.timeout,
-            'available_ports': len(self.get_available_ports())
+            'available_ports': len(serial.tools.list_ports.comports())
         }
 
     def print_status(self) -> None:
