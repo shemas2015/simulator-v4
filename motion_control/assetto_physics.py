@@ -25,6 +25,7 @@ class AssettoPhysics:
         self.previous_z_accel = None
         self.previous_gear = None
         self.arduino_controller = arduino_controller
+        self.logger = logging.getLogger('arduino_control')
 
     def dump_physics_once(self):
         """Read and print all physics data once."""
@@ -79,24 +80,12 @@ class AssettoPhysics:
         phys = self.info.physics
         data = {}
         
-        if hasattr(phys, "_fields_"):
-            for name, _ in phys._fields_:
-                try:
-                    data[name] = getattr(phys, name)
-                except Exception:
-                    data[name] = None
-        else:
-            # fallback: intenta obtener atributos públicos
-            for name in dir(phys):
-                if name.startswith("_"): 
-                    continue
-                try:
-                    val = getattr(phys, name)
-                    if callable(val): 
-                        continue
-                    data[name] = val
-                except Exception:
-                    pass
+        for name, _ in phys._fields_:
+            try:
+                data[name] = getattr(phys, name)
+            except Exception:
+                data[name] = None
+    
         
         return data
 
@@ -278,8 +267,7 @@ class AssettoPhysics:
 
     def monitor_gear_changes(self):
         """Monitor gear changes in a continuous loop with logging."""
-        logger = logging.getLogger('arduino_control')
-        logger.info('Starting gear change monitoring...')
+        self.logger.info('Starting gear change monitoring...')
         try:
             while True:
                 gear_data = self.get_gear_change()
@@ -291,11 +279,11 @@ class AssettoPhysics:
                     if accel_data:
                         accel_info = f" | Accel Factor: {accel_data['factor']:.2f} ({accel_data['status']})"
                     
-                    logger.info(f"Gear change detected: {gear_data['previous_gear']} -> {gear_data['current_gear']} ({gear_data['change_type']}shift){accel_info}")
+                    self.logger.info(f"Gear change detected: {gear_data['previous_gear']} -> {gear_data['current_gear']} ({gear_data['change_type']}shift){accel_info}")
                     
                     # Check for upshift with abrupt acceleration
                     if gear_data['change_type'] == 'up' and accel_data and accel_data['status'] == 'ABRUPT!':
-                        logger.info("MOVER MOTOR - Upshift with abrupt acceleration detected!")
+                        self.logger.info("MOVER MOTOR - Upshift with abrupt acceleration detected!")
                         self.arduino_controller.send_command(speed=100, angle=105)
                     
                     # Add your gear change logic here
@@ -304,4 +292,4 @@ class AssettoPhysics:
                 time.sleep(0.05)  # Check gear changes 20 times per second
                 
         except Exception as e:
-            logger.error(f"Gear monitoring error: {e}")
+            self.logger.error(f"Gear monitoring error: {e}")
