@@ -211,13 +211,17 @@ void potentiometerTask(void *parameter) {
       
     } else {
       currentAngle = currentAngleTmp;
-      /*
-      Serial.print("Time: ");
-      Serial.print(readTime);
-      Serial.print("ms - Current Angle: ");
-      Serial.println(currentAngle);
-      */
     }
+
+    /*
+    //ATENTION!!! the print generate a delay fail, put thi only when need debug
+    Serial.print("Time: ");
+    Serial.print(readTime);
+    Serial.print(" - POT: ");
+    Serial.print(potValue);
+    Serial.print("ms - Current Angle: ");
+    Serial.println(currentAngle);
+    */
     
     vTaskDelay(30 / portTICK_PERIOD_MS); // 5ms delay for high-frequency reading
   }
