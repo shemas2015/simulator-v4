@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Settings, Loader2, Plug, PlugZap } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useMotorByNumber, updateMotorPosition } from "@/hooks/useConnectionStatus";
+import { toast } from "sonner";
 
 interface MotorCardProps {
   motorNumber: 1 | 2;
@@ -11,26 +13,50 @@ interface MotorCardProps {
 }
 
 export const MotorCard = ({ motorNumber, onPositionChange }: MotorCardProps) => {
-  const [isConnected, setIsConnected] = useState(false);
+  const motorConnection = useMotorByNumber(motorNumber);
   const [isTesting, setIsTesting] = useState(false);
-  const [position, setPosition] = useState<"left" | "right" | undefined>(undefined);
+  const [isUpdatingPosition, setIsUpdatingPosition] = useState(false);
+
+  // Use real-time connection data from backend
+  const isConnected = motorConnection?.connected || false;
+  const position = motorConnection?.position || undefined;
+  const port = motorConnection?.port;
+
+  // Notify parent of position changes from backend
+  useEffect(() => {
+    if (position) {
+      onPositionChange?.(position);
+    }
+  }, [position, onPositionChange]);
 
   const handleTestConnection = async () => {
     setIsTesting(true);
     // Simulate connection test
     await new Promise((resolve) => setTimeout(resolve, 2000));
     setIsTesting(false);
-    setIsConnected(true);
+    toast.success("Connection test completed");
   };
 
-  const handlePositionChange = (value: "left" | "right") => {
-    setPosition(value);
-    onPositionChange?.(value);
+  const handlePositionChange = async (value: "left" | "right") => {
+    if (!port) {
+      toast.error("No motor port available");
+      return;
+    }
+
+    setIsUpdatingPosition(true);
+    try {
+      await updateMotorPosition(port, value);
+      toast.success(`Motor position updated to ${value}`);
+    } catch (error) {
+      toast.error("Failed to update motor position");
+      console.error(error);
+    } finally {
+      setIsUpdatingPosition(false);
+    }
   };
 
   const handleDisconnect = () => {
-    setIsConnected(false);
-    setPosition(undefined);
+    toast.info("Disconnect motor from backend to update status");
   };
 
   return (
@@ -84,7 +110,7 @@ export const MotorCard = ({ motorNumber, onPositionChange }: MotorCardProps) => 
           <Select
             value={position}
             onValueChange={handlePositionChange}
-            disabled={!isConnected}
+            disabled={!isConnected || isUpdatingPosition}
           >
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Select position" />

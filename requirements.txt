@@ -1,2 +1,4 @@
 django
 pyserial
+djangorestframework
+django-cors-headers

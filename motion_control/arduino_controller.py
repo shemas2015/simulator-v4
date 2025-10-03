@@ -3,6 +3,7 @@ import serial.tools.list_ports
 import time
 import logging
 from typing import Optional, List, Dict, Any
+from .connection_manager import connection_manager
 
 logger = logging.getLogger(__name__)
 
@@ -13,21 +14,23 @@ class ArduinoController:
     Manages connection, command sending, and response handling.
     """
 
-    def __init__(self, port: str, baudrate: int, timeout: float = 1.0):
+    def __init__(self, port: str, baudrate: int, timeout: float = 1.0, motor_number: Optional[int] = None):
         """
         Initialize Arduino controller.
-        
+
         Args:
             port: Serial port path (e.g., COM3, /dev/ttyUSB0)
             baudrate: Serial communication baud rate
             timeout: Serial communication timeout in seconds
+            motor_number: Optional motor number (1 or 2) for tracking
         """
         self.port = port
         self.baudrate = baudrate
         self.timeout = timeout
+        self.motor_number = motor_number
         self.connection: Optional[serial.Serial] = None
         self._is_connected = False
-        
+
         # Automatically connect on initialization
         self.connect()
 
@@ -35,24 +38,27 @@ class ArduinoController:
     def connect(self) -> bool:
         """
         Connect to Arduino on the configured port.
-            
+
         Returns:
             True if connection successful, False otherwise
         """
         try:
             self.connection = serial.Serial(self.port, self.baudrate, timeout=self.timeout)
             time.sleep(2)  # Wait for Arduino to reset
-            
+
             self._is_connected = True
-            
+
+            # Register connection with ConnectionManager
+            connection_manager.register_connection(self.port, self.motor_number)
+
             logger.info(f"Connected to Arduino on {self.port} at {self.baudrate} baud")
             print(f"✓ Connected to Arduino on {self.port} at {self.baudrate} baud")
             return True
-            
+
         except serial.SerialException as e:
             logger.error(f"Failed to connect to {self.port}: {e}")
             print(f"✗ Failed to connect to {self.port}: {e}")
-            
+
             # Show available ports when connection fails
             print("\nAvailable ports:")
             available_ports = serial.tools.list_ports.comports()
@@ -61,7 +67,7 @@ class ArduinoController:
                     print(f"  {port_info.device} - {port_info.description}")
             else:
                 print("  No Arduino/USB Serial devices found")
-            
+
             return False
 
     def disconnect(self) -> None:
@@ -69,8 +75,12 @@ class ArduinoController:
         if self.connection and self.connection.is_open:
             self.connection.close()
             print("✓ Serial connection closed.")
-        
+
         self._is_connected = False
+
+        # Unregister connection with ConnectionManager
+        connection_manager.unregister_connection(self.port)
+
         self.connection = None
 
     def is_connected(self) -> bool:
