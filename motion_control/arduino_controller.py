@@ -117,6 +117,7 @@ class ArduinoController:
             command = f"{speed},{angle}\n"
             self.connection.write(command.encode())
             
+            """
             if verbose:
                 logger.info(f"Sent command: Speed={speed}, Angle={angle}")
                 print(f"✓ Sent command: Speed={speed}, Angle={angle}")
@@ -125,6 +126,7 @@ class ArduinoController:
             response = self.read_response()
             if response and verbose:
                 print(f"Arduino response: {response}")
+            """
             
             return True
             

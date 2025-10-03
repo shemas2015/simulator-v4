@@ -87,7 +87,7 @@ class Command(BaseCommand):
             arduino.send_command(100,90)
             # Start gear monitoring in background thread
             gear_thread = threading.Thread(
-                target=ac_physics.monitor_gear_changes,
+                target=ac_physics.start_monitoring,
                 daemon=True
             )
             gear_thread.start()
