@@ -75,7 +75,7 @@ void setup() {
 
     // Check if we're in the target range
     if (currentAngle >= 85.0 && currentAngle <= 95.0) {
-      motorStop(currentAngle);
+      motorStop();
       Serial.println("Initial position reached!");
       break;
     }
@@ -89,9 +89,9 @@ void setup() {
 
 
 void loop() {
-  
-  // Check for serial input
-  if (Serial.available() > 0) {
+
+  // Check for serial input only if not currently moving
+  if (Serial.available() > 0 && !parametersSet) {
     String input = Serial.readStringUntil('\n');
     input.trim();
 
@@ -102,10 +102,10 @@ void loop() {
       targetAngle = input.substring(commaIndex + 1).toFloat();
       parametersSet = true; // Mark that parameters have been set
 
-      Serial.print("New settings - Speed: ");
-      Serial.print(inputSpeed);
-      Serial.print(", Target Angle: ");
-      Serial.println(targetAngle);
+      //Serial.print("New settings - Speed: ");
+      //Serial.print(inputSpeed);
+      //Serial.print(", Target Angle: ");
+      //Serial.println(targetAngle);
     }
   }
 
@@ -122,9 +122,9 @@ void loop() {
   // Print current position every second
   unsigned long currentTime = millis();
   if (currentTime - lastPrintTime >= 300) {
-    Serial.print("Current Position: ");
-    Serial.print(currentAngle);
-    Serial.println(" degrees");
+    //Serial.print("Current Position: ");
+    //Serial.print(currentAngle);
+    //Serial.println(" degrees");
     lastPrintTime = currentTime;
   }
   
@@ -146,7 +146,7 @@ void printAngleStatus(float angle, String motorStatus) {
 void motorForward(int speed, float angle) {
   if (currentDirection == MOTOR_BACKWARD) {
     // Stop motor first if changing from backward to forward
-    motorStop(angle);
+    motorStop();
   }
 
   analogWrite(RPWM_PIN, speed);  // PWM speed (0-255)
@@ -158,7 +158,7 @@ void motorForward(int speed, float angle) {
 void motorBackward(int speed, float angle) {
   if (currentDirection == MOTOR_FORWARD) {
     // Stop motor first if changing from forward to backward
-    motorStop(angle);
+    motorStop();
   }
 
   analogWrite(RPWM_PIN, 0);      // Stop forward
@@ -167,13 +167,12 @@ void motorBackward(int speed, float angle) {
   //printAngleStatus(angle, "Motor Backward");
 }
 
-void motorStop(float angle) {
+void motorStop() {
   analogWrite(RPWM_PIN, 0);
   analogWrite(LPWM_PIN, 0);
   currentDirection = MOTOR_STOPPED;
-  printAngleStatus(angle, "Motor Stop");
 
-  delay(500);//ATENTION!!! time to stop , to prevent damages!
+  delay(50);//ATENTION!!! time to stop , to prevent damages!
 }
 
 // Function to position motor based on current and target angles
@@ -182,7 +181,7 @@ void positionMotor( int speed) {
 
   if (abs(angleDifference) <= 5.0) {
     // Within ±5 degrees of target - stop motor
-    motorStop(currentAngle);
+    motorStop();
     parametersSet = false;
   }
   else if (currentAngle > targetAngle) {
