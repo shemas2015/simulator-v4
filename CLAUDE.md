@@ -27,6 +27,16 @@ Django-based motion control simulator integrating Arduino hardware control with 
 
 **motor_reverse/motor_reverse.ino** - Arduino sketch for IBT-2 motor driver using ESP32 pins, handles forward/backward motor control with safety pauses
 
+**front/** - React + Vite + TypeScript frontend application for motor control interface with shadcn/ui components
+
+## Key Frontend Components
+
+**front/src/pages/Index.tsx** - Main dashboard page with dual motor configuration UI, start/stop listening controls, and connection status summary
+
+**front/src/components/MotorCard.tsx** - Reusable motor card component managing individual motor connection state, position selection (left/right), and test connection functionality
+
+**front/src/App.tsx** - Root application component with React Router setup, TanStack Query for data fetching, toast notifications (Sonner), and tooltip provider
+
 ## Development Commands
 
 **Environment:**
@@ -72,6 +82,27 @@ python ac_simulator.py
 python manage.py arduino_control --port COM3
 ```
 
+**Frontend (React):**
+```bash
+# Navigate to frontend directory
+cd front
+
+# Install dependencies
+npm install
+
+# Start development server (runs on port 8080)
+npm run dev
+
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
+
+# Run linter
+npm run lint
+```
+
 ## System Behavior
 
 1. `arduino_control` command connects to Arduino via serial port
@@ -95,6 +126,32 @@ python manage.py arduino_control --port COM3
 - Currently monitors longitudinal acceleration (`physics.accG[2]`)
 - Physics structure includes pitch, roll, gear, speed, RPM, G-forces, etc.
 
+## Frontend Architecture
+
+**Tech Stack:**
+- React 18.3 with TypeScript
+- Vite 5.4 for build tooling and dev server
+- TailwindCSS 3.4 for styling
+- shadcn/ui component library (Radix UI primitives)
+- TanStack Query for data fetching/state management
+- React Router v6 for routing
+- Sonner for toast notifications
+- Lucide React for icons
+
+**UI Features:**
+- Dual motor configuration interface with position selection (left/right motor)
+- Real-time connection status monitoring with visual indicators
+- Test connection functionality with loading states
+- Start/stop listening controls with validation
+- Connection summary dashboard showing total motors, configured count, and active sessions
+- Responsive design with card-based layout
+- Dark mode support via next-themes
+
+**Current Limitations:**
+- Frontend UI is currently mockup-only with simulated connection testing (2-second delay)
+- No backend integration yet - motor connection, position changes, and listening state are client-side only
+- Backend API endpoints need to be created in Django to handle motor control and physics monitoring
+
 ## Important Notes
 
 - Arduino controller waits 2 seconds after connection for Arduino reset
@@ -102,3 +159,4 @@ python manage.py arduino_control --port COM3
 - Logging configured to write verbose logs to `logs/arduino_control.log`
 - System uses background threading - main thread must stay alive for monitoring to continue
 - Shared memory only works on Windows (Assetto Corsa requirement)
+- Frontend runs on port 8080, Django backend on default port 8000
