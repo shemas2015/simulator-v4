@@ -31,19 +31,8 @@ class Command(BaseCommand):
         try:
             # Check if port is provided
             if not options['port']:
-                # Get available ports without creating instance
-                #available_ports = ArduinoController.get_available_ports()
-                ports = serial.tools.list_ports.comports()
-                available_ports = []
-                
-                for port in ports:
-                    # Filter for likely Arduino ports
-                    if any(keyword in port.description.lower() for keyword in ['arduino', 'usb', 'serial', 'ch340', 'cp2102']):
-                        available_ports.append({
-                            'device': port.device,
-                            'description': port.description,
-                            'hwid': port.hwid
-                        })
+                # Get available ports using static method
+                available_ports = ArduinoController.get_available_ports()
 
                 self.logger.error('Port parameter is required')
                 self.logger.info('Available COM ports:')
@@ -57,19 +46,7 @@ class Command(BaseCommand):
                     self.logger.info('  No Arduino/USB Serial devices found')
                 return
             
-            # Connect to Assetto Corsa and start pitch/roll monitoring
-            
-            
-            """
-            # Start monitoring in background thread
-            monitor_thread = threading.Thread(
-                target=ac_physics.monitor_pitch_roll, 
-                daemon=True
-            )
-            monitor_thread.start()
-            self.logger.info('Physics monitoring started in background')
-            """
-            
+
             # Create Arduino controller with specified options
             arduino = ArduinoController(
                 port=options['port'],

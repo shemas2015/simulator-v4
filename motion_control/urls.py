@@ -2,11 +2,11 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    # REST API endpoints
-    path('api/connections/', views.get_connections, name='get_connections'),
-    path('api/connections/<str:port>/', views.get_connection_status, name='get_connection_status'),
-    path('api/connections/<str:port>/position/', views.update_motor_position, name='update_motor_position'),
+    # Motor management endpoints
+    path('api/motors/add/<int:motor_number>/<path:device>/', views.add_motor, name='add_motor'),
+    path('api/motors/', views.get_motors, name='get_motors'),
+    path('api/motors/remove/<int:motor_number>/', views.remove_motor, name='remove_motor'),
 
-    # Server-Sent Events endpoint for real-time updates
-    path('api/events/connections/', views.connection_events_stream, name='connection_events_stream'),
+    # Available ports endpoint
+    path('api/available_ports/', views.get_available_ports, name='get_available_ports'),
 ]

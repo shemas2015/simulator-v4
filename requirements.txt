@@ -2,3 +2,4 @@ django
 pyserial
 djangorestframework
 django-cors-headers
+python-dotenv

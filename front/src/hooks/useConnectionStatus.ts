@@ -13,7 +13,7 @@ export interface ConnectionState {
   [port: string]: MotorConnection;
 }
 
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://100.93.112.98:8000';
 
 export const useConnectionStatus = () => {
   const [connections, setConnections] = useState<ConnectionState>({});

@@ -3,7 +3,7 @@ import serial.tools.list_ports
 import time
 import logging
 from typing import Optional, List, Dict, Any
-from .connection_manager import connection_manager
+#from .connection_manager import connection_manager
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ class ArduinoController:
         self.port = port
         self.baudrate = baudrate
         self.timeout = timeout
-        self.motor_number = motor_number
+        self.motor_number = motor_number #0 left, 1 right
         self.connection: Optional[serial.Serial] = None
         self._is_connected = False
 
@@ -49,10 +49,7 @@ class ArduinoController:
             self._is_connected = True
 
             # Register connection with ConnectionManager
-            connection_manager.register_connection(self.port, self.motor_number)
-
             logger.info(f"Connected to Arduino on {self.port} at {self.baudrate} baud")
-            print(f"✓ Connected to Arduino on {self.port} at {self.baudrate} baud")
             return True
 
         except serial.SerialException as e:
@@ -79,7 +76,7 @@ class ArduinoController:
         self._is_connected = False
 
         # Unregister connection with ConnectionManager
-        connection_manager.unregister_connection(self.port)
+        #connection_manager.unregister_connection(self.port)
 
         self.connection = None
 
@@ -337,3 +334,25 @@ class ArduinoController:
             self.disconnect()
         except Exception:
             pass
+
+    @staticmethod
+    def get_available_ports():
+        """
+        Get available Arduino/ESP32 ports.
+
+        Returns:
+            list: Available ports with device, description, and hwid
+        """
+        ports = serial.tools.list_ports.comports()
+        available_ports = []
+
+        for port in ports:
+            # Filter for likely Arduino ports
+            if any(keyword in port.description.lower() for keyword in ['arduino', 'usb', 'serial', 'ch340', 'cp2102']):
+                available_ports.append({
+                    'device': port.device,
+                    'description': port.description,
+                    'hwid': port.hwid
+                })
+
+        return available_ports

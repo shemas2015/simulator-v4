@@ -5,128 +5,126 @@ from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
-from .connection_manager import connection_manager
+#from .connection_manager import connection_manager
 import logging
+from motion_control.arduino_controller import ArduinoController
 
 logger = logging.getLogger(__name__)
 
-
-@api_view(['GET'])
-def get_connections(request):
-    """
-    Get all current motor connections.
-
-    Returns:
-        JSON response with all connections
-    """
-    connections = connection_manager.get_all_connections()
-    return Response({
-        'connections': connections,
-        'count': len(connections)
-    })
+# Global list to manage ArduinoController instances
+arduino_controllers = {}
 
 
 @api_view(['GET'])
-def get_connection_status(request, port):
+def add_motor(request, motor_number, device):
     """
-    Get connection status for a specific port.
+    Add a motor to ArduinoController list.
 
     Args:
-        port: Serial port identifier
+        motor_number: Motor number (0 for left, 1 for right)
+        device: Device port (e.g., "COM5", "/dev/ttyUSB0")
 
     Returns:
-        JSON response with connection info
+        JSON response with motor info
     """
-    connection = connection_manager.get_connection(port)
+    try:
+        motor_number = int(motor_number)
 
-    if connection:
-        return Response(connection)
-    else:
-        return Response(
-            {'error': 'Connection not found'},
-            status=status.HTTP_404_NOT_FOUND
+        # Validate motor number
+        if motor_number not in [0, 1]:
+            return Response(
+                {'error': 'Motor number must be 0 (left) or 1 (right)'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Check if motor already exists
+        if motor_number in arduino_controllers:
+            return Response(
+                {'error': f'Motor {motor_number} already exists'},
+                status=status.HTTP_409_CONFLICT
+            )
+
+        # Check if device exists in available ports
+        available_ports = ArduinoController.get_available_ports()
+        available_devices = [port['device'] for port in available_ports]
+
+        if device not in available_devices:
+            return Response(
+                {'error': f'Device {device} not found in available ports. Available: {available_devices}'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Create Arduino controller
+        arduino = ArduinoController(
+            port=device,
+            baudrate=9600,
+            motor_number=motor_number
         )
 
+        # Check if connection was successful
+        if not arduino._is_connected:
+            return Response(
+                {'error': f'Failed to connect to device {device}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
-@api_view(['POST'])
-def update_motor_position(request, port):
-    """
-    Update motor position (left/right).
-
-    Args:
-        port: Serial port identifier
-
-    Expected body:
-        {
-            "position": "left" | "right"
+        # Add to controllers list
+        arduino_controllers[motor_number] = {
+            'controller': arduino,
+            'device': device,
+            'motor_number': motor_number,
+            'position': 'left' if motor_number == 0 else 'right',
+            'connected': True
         }
-    """
-    position = request.data.get('position')
 
-    if position not in ['left', 'right']:
+        logger.info(f"Motor {motor_number} added on device {device}")
+
+        return Response({
+            'success': True,
+            'motor_number': motor_number,
+            'device': device,
+            'position': 'left' if motor_number == 0 else 'right',
+            'connected': True
+        })
+
+    except ValueError:
         return Response(
-            {'error': 'Invalid position. Must be "left" or "right"'},
+            {'error': 'Invalid motor number format'},
             status=status.HTTP_400_BAD_REQUEST
         )
-
-    connection = connection_manager.get_connection(port)
-    if not connection:
+    except Exception as e:
+        logger.error(f"Error adding motor: {e}")
         return Response(
-            {'error': 'Connection not found'},
-            status=status.HTTP_404_NOT_FOUND
+            {'error': f'Failed to add motor: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
-    connection_manager.update_motor_position(port, position)
 
-    return Response({
-        'port': port,
-        'position': position,
-        'success': True
-    })
-
-
-def connection_events_stream(request):
+def get_motors(request):
     """
-    Server-Sent Events (SSE) endpoint for real-time connection updates.
-
-    Streams connection status changes to the frontend.
+    Server-Sent Events (SSE) endpoint for motors.
+    Returns all connected motors in real-time.
     """
     def event_stream():
-        # Send initial connection state
-        connections = connection_manager.get_all_connections()
-        yield f"data: {json.dumps({'type': 'init', 'connections': connections})}\n\n"
-
-        # Track last sent state to only send changes
-        last_state = connections.copy()
-
-        # Listener callback for connection changes
-        changes = []
-
-        def on_change(new_connections):
-            changes.append(new_connections)
-
-        # Register listener
-        connection_manager.add_listener(on_change)
-
         try:
-            # Keep connection alive and send updates
             while True:
-                if changes:
-                    # Get latest change
-                    new_connections = changes.pop()
+                # Get all connected motors
+                motors = []
+                for motor_number, motor_info in arduino_controllers.items():
+                    motors.append({
+                        'motor_number': motor_number,
+                        'device': motor_info['device'],
+                        'position': motor_info['position'],
+                        'connected': motor_info['connected']
+                    })
 
-                    # Only send if state actually changed
-                    if new_connections != last_state:
-                        yield f"data: {json.dumps({'type': 'update', 'connections': new_connections})}\n\n"
-                        last_state = new_connections.copy()
+                # Send current motors
+                yield f"data: {json.dumps({'motors': motors, 'count': len(motors)})}\n\n"
 
-                # Send heartbeat every 15 seconds to keep connection alive
-                yield f": heartbeat\n\n"
-                time.sleep(1)
+                # Check every 3 seconds
+                time.sleep(3)
 
         except GeneratorExit:
-            # Client disconnected
-            connection_manager.remove_listener(on_change)
             logger.info("SSE client disconnected")
 
     response = StreamingHttpResponse(
@@ -137,3 +135,76 @@ def connection_events_stream(request):
     response['X-Accel-Buffering'] = 'no'
 
     return response
+
+
+@api_view(['GET'])
+def get_available_ports(request):
+    """
+    Get all available Arduino/ESP32 ports.
+
+    Returns:
+        JSON response with all available ports
+    """
+    try:
+        available_ports = ArduinoController.get_available_ports()
+
+        return Response({
+            'available_ports': available_ports,
+            'count': len(available_ports)
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting available ports: {e}")
+        return Response(
+            {'error': f'Failed to get available ports: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['DELETE'])
+def remove_motor(request, motor_number):
+    """
+    Remove a motor from ArduinoController list.
+
+    Args:
+        motor_number: Motor number to remove
+
+    Returns:
+        JSON response with result
+    """
+    try:
+        motor_number = int(motor_number)
+
+        if motor_number not in arduino_controllers:
+            return Response(
+                {'error': f'Motor {motor_number} not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # Disconnect and remove
+        motor_info = arduino_controllers[motor_number]
+        if motor_info['controller'].connection:
+            motor_info['controller'].connection.close()
+
+        del arduino_controllers[motor_number]
+
+        logger.info(f"Motor {motor_number} removed")
+
+        return Response({
+            'success': True,
+            'message': f'Motor {motor_number} removed'
+        })
+
+    except ValueError:
+        return Response(
+            {'error': 'Invalid motor number format'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    except Exception as e:
+        logger.error(f"Error removing motor: {e}")
+        return Response(
+            {'error': f'Failed to remove motor: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
