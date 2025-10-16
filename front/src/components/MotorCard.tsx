@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Settings, Loader2, Plug, PlugZap } from "lucide-react";
+import { Settings, Plug, PlugZap, ArrowUp, ArrowDown } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -14,7 +14,6 @@ interface MotorCardProps {
 
 export const MotorCard = ({ motorNumber, onPositionChange }: MotorCardProps) => {
   const motorConnection = useMotorByNumber(motorNumber);
-  const [isTesting, setIsTesting] = useState(false);
   const [isUpdatingPosition, setIsUpdatingPosition] = useState(false);
 
   // Use real-time connection data from backend
@@ -28,14 +27,6 @@ export const MotorCard = ({ motorNumber, onPositionChange }: MotorCardProps) => 
       onPositionChange?.(position);
     }
   }, [position, onPositionChange]);
-
-  const handleTestConnection = async () => {
-    setIsTesting(true);
-    // Simulate connection test
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    setIsTesting(false);
-    toast.success("Connection test completed");
-  };
 
   const handlePositionChange = async (value: "left" | "right") => {
     if (!port) {
@@ -55,8 +46,14 @@ export const MotorCard = ({ motorNumber, onPositionChange }: MotorCardProps) => 
     }
   };
 
-  const handleDisconnect = () => {
-    toast.info("Disconnect motor from backend to update status");
+  const handleMoveForward = () => {
+    // TODO: Implement move forward API call
+    toast.info("Moving motor forward");
+  };
+
+  const handleMoveBackward = () => {
+    // TODO: Implement move backward API call
+    toast.info("Moving motor backward");
   };
 
   return (
@@ -122,33 +119,26 @@ export const MotorCard = ({ motorNumber, onPositionChange }: MotorCardProps) => 
           </Select>
         </div>
 
-        {/* Actions */}
+        {/* Motor Control Actions */}
         <div className="flex gap-3">
-          {!isConnected ? (
-            <Button
-              onClick={handleTestConnection}
-              disabled={isTesting}
-              className="flex-1"
-              variant={isTesting ? "secondary" : "default"}
-            >
-              {isTesting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Testing...
-                </>
-              ) : (
-                "Test Connection"
-              )}
-            </Button>
-          ) : (
-            <Button
-              onClick={handleDisconnect}
-              variant="destructive"
-              className="flex-1"
-            >
-              Disconnect
-            </Button>
-          )}
+          <Button
+            onClick={handleMoveForward}
+            disabled={!position}
+            className="flex-1"
+            variant="default"
+          >
+            <ArrowUp className="w-4 h-4 mr-2" />
+            Forward
+          </Button>
+          <Button
+            onClick={handleMoveBackward}
+            disabled={!position}
+            className="flex-1"
+            variant="default"
+          >
+            <ArrowDown className="w-4 h-4 mr-2" />
+            Backward
+          </Button>
         </div>
 
         {/* Status Indicator */}

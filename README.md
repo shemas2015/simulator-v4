@@ -17,6 +17,8 @@ This project provides a web interface and control system for motor simulation, i
 
 ## Setup
 
+### Backend (Django)
+
 1. **Activate virtual environment:**
    ```bash
    env\Scripts\activate
@@ -36,6 +38,39 @@ This project provides a web interface and control system for motor simulation, i
    ```bash
    python manage.py runserver
    ```
+
+### Frontend (React + Vite)
+
+1. **Navigate to frontend directory:**
+   ```bash
+   cd front
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Configure environment variables:**
+
+   Copy the example environment file and update with your backend URL:
+   ```bash
+   cp .env.example .env
+   ```
+
+   Edit `front/.env` and set your Django backend server address:
+   ```env
+   VITE_API_BASE_URL=http://100.120.143.100:9000
+   ```
+
+   **Note:** Vite automatically loads `.env` files. Variables prefixed with `VITE_` are exposed to the client code. Restart the dev server after changing `.env` values.
+
+4. **Run development server:**
+   ```bash
+   npm run dev
+   ```
+
+   Frontend runs on port 8080 by default.
 
 ## Management Commands
 

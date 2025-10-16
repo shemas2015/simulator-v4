@@ -148,16 +148,17 @@ def get_available_ports(request):
     try:
         available_ports = ArduinoController.get_available_ports()
 
-        return Response({
+        # Use JsonResponse to avoid DRF content negotiation issues with SSE clients
+        return JsonResponse({
             'available_ports': available_ports,
             'count': len(available_ports)
         })
 
     except Exception as e:
         logger.error(f"Error getting available ports: {e}")
-        return Response(
+        return JsonResponse(
             {'error': f'Failed to get available ports: {str(e)}'},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            status=500
         )
 
 

@@ -11,6 +11,10 @@ __pycache__/
 *.db
 *.sqlite3
 
+# Logs folder - ignore contents but keep folder
+logs/*
+!logs/.gitkeep
+
 # Local environment
 .env
 .venv/

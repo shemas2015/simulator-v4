@@ -13,7 +13,7 @@ export interface ConnectionState {
   [port: string]: MotorConnection;
 }
 
-const API_BASE_URL = 'http://100.93.112.98:8000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9000';
 
 export const useConnectionStatus = () => {
   const [connections, setConnections] = useState<ConnectionState>({});
@@ -21,8 +21,8 @@ export const useConnectionStatus = () => {
   const eventSourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
-    // Create SSE connection
-    const eventSource = new EventSource(`${API_BASE_URL}/api/events/connections/`);
+    // Create SSE connection to the motors endpoint
+    const eventSource = new EventSource(`${API_BASE_URL}/api/motors/`);
     eventSourceRef.current = eventSource;
 
     eventSource.onopen = () => {
