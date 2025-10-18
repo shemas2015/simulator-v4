@@ -1,75 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
-
-export interface MotorConnection {
-  port: string;
-  connected: boolean;
-  motor_number: number | null;
-  position: 'left' | 'right' | null;
-  connected_at: string;
-  last_command: any | null;
-}
-
-export interface ConnectionState {
-  [port: string]: MotorConnection;
-}
+// Re-export from context for backward compatibility
+import { useConnectionStatus as useConnectionStatusContext } from '@/contexts/ConnectionContext';
+export { useConnectionStatus, ConnectionProvider } from '@/contexts/ConnectionContext';
+export type { MotorConnection, ConnectionState } from '@/contexts/ConnectionContext';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9000';
 
-export const useConnectionStatus = () => {
-  const [connections, setConnections] = useState<ConnectionState>({});
-  const [isConnected, setIsConnected] = useState(false);
-  const eventSourceRef = useRef<EventSource | null>(null);
-
-  useEffect(() => {
-    // Create SSE connection to the motors endpoint
-    const eventSource = new EventSource(`${API_BASE_URL}/api/motors/`);
-    eventSourceRef.current = eventSource;
-
-    eventSource.onopen = () => {
-      console.log('SSE connection established');
-      setIsConnected(true);
-    };
-
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-
-        if (data.type === 'init' || data.type === 'update') {
-          setConnections(data.connections);
-        }
-      } catch (error) {
-        console.error('Error parsing SSE message:', error);
-      }
-    };
-
-    eventSource.onerror = (error) => {
-      console.error('SSE error:', error);
-      setIsConnected(false);
-
-      // Reconnect after 5 seconds
-      setTimeout(() => {
-        if (eventSourceRef.current?.readyState === EventSource.CLOSED) {
-          eventSource.close();
-          // The effect will recreate the connection on next render
-        }
-      }, 5000);
-    };
-
-    // Cleanup on unmount
-    return () => {
-      eventSource.close();
-      eventSourceRef.current = null;
-    };
-  }, []);
-
-  return {
-    connections,
-    isConnected,
-  };
-};
-
-export const useMotorByNumber = (motorNumber: 1 | 2) => {
-  const { connections } = useConnectionStatus();
+export const useMotorByNumber = (motorNumber: 0 | 1) => {
+  const { connections } = useConnectionStatusContext();
 
   // Find connection with matching motor_number
   const motorConnection = Object.values(connections).find(

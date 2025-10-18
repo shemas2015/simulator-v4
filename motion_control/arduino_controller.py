@@ -335,6 +335,33 @@ class ArduinoController:
         except Exception:
             pass
 
+    def send_manual_command(self, command: str) -> bool:
+        """
+        Send manual command to Arduino (f=forward, b=backward).
+
+        Args:
+            command: Single character command ('f' or 'b')
+
+        Returns:
+            True if sent successfully, False otherwise
+        """
+        if not self.is_connected():
+            logger.error("No active connection to Arduino")
+            return False
+
+        if command not in ['f', 'b']:
+            logger.error(f"Invalid command: {command}. Must be 'f' or 'b'")
+            return False
+
+        try:
+            self.connection.write(command.encode())
+            logger.info(f"Sent manual command '{command}' ({'forward' if command == 'f' else 'backward'})")
+            return True
+
+        except Exception as e:
+            logger.error(f"Error sending manual command: {e}")
+            return False
+
     @staticmethod
     def get_available_ports():
         """

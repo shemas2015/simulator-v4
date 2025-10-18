@@ -34,9 +34,9 @@ This project provides a web interface and control system for motor simulation, i
    python manage.py migrate
    ```
 
-4. **Run development server:**
+4. **Run development server (with WebSocket support):**
    ```bash
-   python manage.py runserver
+   daphne -b 0.0.0.0 -p 9000 simulator.asgi:application
    ```
 
 ### Frontend (React + Vite)

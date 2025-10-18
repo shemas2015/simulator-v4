@@ -3,3 +3,5 @@ pyserial
 djangorestframework
 django-cors-headers
 python-dotenv
+channels
+daphne

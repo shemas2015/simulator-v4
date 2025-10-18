@@ -1,25 +1,34 @@
-import { useState, useEffect } from "react";
-import { Settings, Plug, PlugZap, ArrowUp, ArrowDown } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { Settings, Plug, PlugZap, ArrowUp, ArrowDown, AlertTriangle } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
-import { useMotorByNumber, updateMotorPosition } from "@/hooks/useConnectionStatus";
+import { useMotorByNumber, updateMotorPosition, useConnectionStatus } from "@/hooks/useConnectionStatus";
 import { toast } from "sonner";
 
 interface MotorCardProps {
-  motorNumber: 1 | 2;
+  motorNumber: 0 | 1; // 0 left, 1 right
   onPositionChange?: (position: "left" | "right") => void;
 }
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9000';
+
 export const MotorCard = ({ motorNumber, onPositionChange }: MotorCardProps) => {
   const motorConnection = useMotorByNumber(motorNumber);
+  const { availablePorts } = useConnectionStatus();
   const [isUpdatingPosition, setIsUpdatingPosition] = useState(false);
+  const [selectedPort, setSelectedPort] = useState<string | undefined>(undefined);
+  const [isArduinoConnected, setIsArduinoConnected] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Use real-time connection data from backend
-  const isConnected = motorConnection?.connected || false;
+  // Use real-time connection data from backend or local selection
+  const isConnected = motorConnection?.connected || isArduinoConnected;
   const position = motorConnection?.position || undefined;
-  const port = motorConnection?.port;
+  const port = motorConnection?.port || selectedPort;
 
   // Notify parent of position changes from backend
   useEffect(() => {
@@ -28,32 +37,90 @@ export const MotorCard = ({ motorNumber, onPositionChange }: MotorCardProps) => 
     }
   }, [position, onPositionChange]);
 
-  const handlePositionChange = async (value: "left" | "right") => {
-    if (!port) {
-      toast.error("No motor port available");
-      return;
-    }
+  // Cleanup WebSocket and interval on unmount
+  useEffect(() => {
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, []);
 
-    setIsUpdatingPosition(true);
+  const handlePortSelect = async (portDevice: string) => {
+    setSelectedPort(portDevice);
+    setIsConnecting(true);
+
     try {
-      await updateMotorPosition(port, value);
-      toast.success(`Motor position updated to ${value}`);
+      // Create WebSocket connection to Arduino
+      const wsUrl = API_BASE_URL.replace(/^http/, 'ws');
+      const ws = new WebSocket(`${wsUrl}/ws/arduino/${encodeURIComponent(portDevice)}/`);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        setIsArduinoConnected(true);
+        setIsConnecting(false);
+        toast.success(`Connected to Arduino on ${portDevice}`);
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        setIsArduinoConnected(false);
+        setIsConnecting(false);
+        setSelectedPort(undefined);
+        toast.error(`Failed to connect to Arduino on ${portDevice}`);
+        ws.close();
+      };
+
+      ws.onclose = () => {
+        setIsArduinoConnected(false);
+        setIsConnecting(false);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (!data.success) {
+            console.error('Arduino command error:', data.error);
+          }
+        } catch (error) {
+          console.error('Error parsing WebSocket message:', error);
+        }
+      };
     } catch (error) {
-      toast.error("Failed to update motor position");
-      console.error(error);
-    } finally {
-      setIsUpdatingPosition(false);
+      console.error('Error creating WebSocket:', error);
+      setIsConnecting(false);
+      setSelectedPort(undefined);
+      toast.error(`Failed to connect to Arduino on ${portDevice}`);
     }
   };
 
-  const handleMoveForward = () => {
-    // TODO: Implement move forward API call
-    toast.info("Moving motor forward");
+  const sendCommand = (command: 'f' | 'b') => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ command }));
+    }
   };
 
-  const handleMoveBackward = () => {
-    // TODO: Implement move backward API call
-    toast.info("Moving motor backward");
+  const handleMouseDown = (command: 'f' | 'b') => {
+    // Send immediately on press
+    sendCommand(command);
+
+    // Send repeatedly while holding
+    intervalRef.current = setInterval(() => {
+      sendCommand(command);
+    }, 100); // Send every 100ms
+  };
+
+  const handleMouseUp = () => {
+    // Stop sending when released
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
   };
 
   return (
@@ -80,7 +147,7 @@ export const MotorCard = ({ motorNumber, onPositionChange }: MotorCardProps) => 
               )}
             </div>
             <div>
-              <h3 className="text-xl font-semibold">Motor {motorNumber}</h3>
+              <h3 className="text-xl font-semibold">{motorNumber === 0 ? "Left Motor" : "Right Motor"}</h3>
               <p className="text-sm text-muted-foreground">
                 {isConnected ? "Connected" : "Disconnected"}
               </p>
@@ -101,29 +168,46 @@ export const MotorCard = ({ motorNumber, onPositionChange }: MotorCardProps) => 
           />
         </div>
 
-        {/* Position Selection */}
+        {/* Port Selection */}
         <div className="space-y-2">
-          <label className="text-sm font-medium">Motor Position</label>
+          <label className="text-sm font-medium">Motor Port</label>
           <Select
-            value={position}
-            onValueChange={handlePositionChange}
-            disabled={!isConnected || isUpdatingPosition}
+            value={selectedPort}
+            onValueChange={handlePortSelect}
+            disabled={availablePorts.length === 0}
           >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select position" />
+              <SelectValue placeholder={availablePorts.length === 0 ? "No ports available" : "Select port"} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="left">Left Motor</SelectItem>
-              <SelectItem value="right">Right Motor</SelectItem>
+              {availablePorts.map((port) => (
+                <SelectItem key={port.device} value={port.device}>
+                  {port.device}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
 
+        {/* Warning Alert when port is selected */}
+        {isArduinoConnected && (
+          <Alert className="border-yellow-500 bg-yellow-500/10">
+            <AlertTriangle className="h-4 w-4 text-yellow-500" />
+            <AlertDescription className="text-sm font-medium">
+              Attention! Keep the potentiometer disconnected during initial positioning configuration
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Motor Control Actions */}
         <div className="flex gap-3">
           <Button
-            onClick={handleMoveForward}
-            disabled={!position}
+            onMouseDown={() => handleMouseDown('f')}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onTouchStart={() => handleMouseDown('f')}
+            onTouchEnd={handleMouseUp}
+            disabled={!isArduinoConnected || isConnecting}
             className="flex-1"
             variant="default"
           >
@@ -131,8 +215,12 @@ export const MotorCard = ({ motorNumber, onPositionChange }: MotorCardProps) => 
             Forward
           </Button>
           <Button
-            onClick={handleMoveBackward}
-            disabled={!position}
+            onMouseDown={() => handleMouseDown('b')}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onTouchStart={() => handleMouseDown('b')}
+            onTouchEnd={handleMouseUp}
+            disabled={!isArduinoConnected || isConnecting}
             className="flex-1"
             variant="default"
           >
@@ -158,7 +246,7 @@ export const MotorCard = ({ motorNumber, onPositionChange }: MotorCardProps) => 
           />
           <span className="text-sm font-medium">
             {isConnected
-              ? `Ready ${position ? `(${position})` : ""}`
+              ? `Connected ${selectedPort ? `(${selectedPort})` : ""}`
               : "Awaiting connection"}
           </span>
         </div>

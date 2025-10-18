@@ -13,6 +13,7 @@ int inputSpeed = 0;         // No default speed
 float targetAngle = 0.0;    // No default target angle
 bool parametersSet = false; // Flag to track if parameters have been set
 int selectedMotor = -1;     // Motor selection: 0=left, 1=right, -1=not set
+int manualSpeedPWM = 150;   // Speed for manual control during motor selection
 
 // Global variables for potentiometer reading (shared between tasks)
 volatile float currentAngle = 0.0;
@@ -44,27 +45,55 @@ void setup() {
   digitalWrite(R_EN_PIN, HIGH);
   digitalWrite(L_EN_PIN, HIGH);
 
-  // Initialize motor in stopped state
-  analogWrite(RPWM_PIN, 0);
-  analogWrite(LPWM_PIN, 0);
+  
 
   Serial.println("Potentiometer and IBT-2 initialized");
   Serial.println("Select motor: 0=left, 1=right");
 
-  // Wait for valid motor selection
+  // Wait for valid motor selection (manual control also works here)
   unsigned long lastPrompt = 0;
+  unsigned long lastManualCommandTime = 0;
   while (selectedMotor < 0) {
     if (Serial.available() > 0) {
-      String input = Serial.readStringUntil('\n');
-      input.trim();
-      int motor = input.toInt();
-      if (motor == 0 || motor == 1) {
-        selectedMotor = motor;
-        Serial.print("Motor ");
-        Serial.print(selectedMotor == 0 ? "left" : "right");
-        Serial.println(" selected");
+      char firstChar = Serial.peek();
+
+      // Check if it's a manual command
+      if (firstChar == 'f' || firstChar == 'b') {
+        char cmd = Serial.read();
+        lastManualCommandTime = millis();  // Update timestamp
+        if (cmd == 'f') {
+          analogWrite(RPWM_PIN, manualSpeedPWM);
+          analogWrite(LPWM_PIN, 0);
+        } else if (cmd == 'b') {
+          analogWrite(RPWM_PIN, 0);
+          analogWrite(LPWM_PIN, manualSpeedPWM);
+        }
+        // Don't process further - continue waiting for motor selection
+      }
+      // Check if it's a digit (motor selection)
+      else if (firstChar == '0' || firstChar == '1') {
+        String input = Serial.readStringUntil('\n');
+        input.trim();
+        int motor = input.toInt();
+        if (motor == 0 || motor == 1) {
+          selectedMotor = motor;
+          Serial.print("Motor ");
+          Serial.print(selectedMotor == 0 ? "left" : "right");
+          Serial.println(" selected");
+        }
+      }
+      // Invalid input - consume and ignore
+      else {
+        Serial.read();
       }
     }
+
+    // Stop motor if no manual command received within timeout (200ms)
+    if (millis() - lastManualCommandTime > 50) {
+      analogWrite(RPWM_PIN, 0);
+      analogWrite(LPWM_PIN, 0);
+    }
+
     if (millis() - lastPrompt > 2000) {
       Serial.println("Waiting for motor selection (0 left or 1 right)..."); //ATENTION!! add a led inficator to know the state (wating set mmotor)
       lastPrompt = millis();
@@ -110,15 +139,15 @@ void loop() {
 
   // Only move motor if we have valid potentiometer reading and parameters are set
   if (parametersSet) {
-    positionMotor( inputSpeed);
+    positionMotor(inputSpeed);
   } else {
     // Keep motor stopped until parameters are set
     analogWrite(RPWM_PIN, 0);
     analogWrite(LPWM_PIN, 0);
   }
-  
+
   delay(10);
-  
+
 
 }
 

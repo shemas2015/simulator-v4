@@ -40,8 +40,8 @@ const Index = () => {
 
         {/* Motor Cards Grid */}
         <div className="grid md:grid-cols-2 gap-6">
-          <MotorCard motorNumber={1} onPositionChange={setMotor1Position} />
-          <MotorCard motorNumber={2} onPositionChange={setMotor2Position} />
+          <MotorCard motorNumber={0} onPositionChange={setMotor1Position} />
+          <MotorCard motorNumber={1} onPositionChange={setMotor2Position} />
         </div>
 
         {/* Main Control Panel */}
