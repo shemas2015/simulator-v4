@@ -14,7 +14,7 @@ class ArduinoController:
     Manages connection, command sending, and response handling.
     """
 
-    def __init__(self, port: str, baudrate: int, timeout: float = 1.0, motor_number: Optional[int] = None):
+    def __init__(self, port: str, baudrate: int, timeout: float = 1.0, motor_number = None):
         """
         Initialize Arduino controller.
 
@@ -180,6 +180,12 @@ class ArduinoController:
         finally:
             if timeout is not None:
                 self.connection.timeout = old_timeout
+
+    def set_motor_number(self,motor_num:int):
+        self.motor_number = motor_num
+        motor_cmd = f"{self.motor_number}\n"
+        self.connection.write(motor_cmd.encode())
+        logger.info(f"Sent motor number {self.motor_number} to Arduino")
 
     def send_raw_command(self, command: str, verbose: bool = True) -> bool:
         """

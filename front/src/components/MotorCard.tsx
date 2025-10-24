@@ -10,24 +10,24 @@ import { toast } from "sonner";
 
 interface MotorCardProps {
   motorNumber: 0 | 1; // 0 left, 1 right
+  position: "left" | "right";
   onPositionChange?: (position: "left" | "right") => void;
+  wsRef: React.RefObject<WebSocket | null>;
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9000';
 
-export const MotorCard = ({ motorNumber, onPositionChange }: MotorCardProps) => {
+export const MotorCard = ({ motorNumber, position, onPositionChange, wsRef }: MotorCardProps) => {
   const motorConnection = useMotorByNumber(motorNumber);
   const { availablePorts } = useConnectionStatus();
   const [isUpdatingPosition, setIsUpdatingPosition] = useState(false);
   const [selectedPort, setSelectedPort] = useState<string | undefined>(undefined);
   const [isArduinoConnected, setIsArduinoConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const wsRef = useRef<WebSocket | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Use real-time connection data from backend or local selection
   const isConnected = motorConnection?.connected || isArduinoConnected;
-  const position = motorConnection?.position || undefined;
   const port = motorConnection?.port || selectedPort;
 
   // Notify parent of position changes from backend
@@ -37,13 +37,9 @@ export const MotorCard = ({ motorNumber, onPositionChange }: MotorCardProps) => 
     }
   }, [position, onPositionChange]);
 
-  // Cleanup WebSocket and interval on unmount
+  // Cleanup interval on unmount
   useEffect(() => {
     return () => {
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
-      }
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
@@ -56,43 +52,54 @@ export const MotorCard = ({ motorNumber, onPositionChange }: MotorCardProps) => 
     setIsConnecting(true);
 
     try {
-      // Create WebSocket connection to Arduino
-      const wsUrl = API_BASE_URL.replace(/^http/, 'ws');
-      const ws = new WebSocket(`${wsUrl}/ws/arduino/${encodeURIComponent(portDevice)}/`);
-      wsRef.current = ws;
+      // Send connect message via existing WebSocket
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({
+          action: 'connect',
+          port: portDevice,
+          motor: motorNumber
+        }));
 
-      ws.onopen = () => {
-        setIsArduinoConnected(true);
-        setIsConnecting(false);
-        toast.success(`Connected to Arduino on ${portDevice}`);
-      };
-
-      ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        setIsArduinoConnected(false);
-        setIsConnecting(false);
-        setSelectedPort(undefined);
-        toast.error(`Failed to connect to Arduino on ${portDevice}`);
-        ws.close();
-      };
-
-      ws.onclose = () => {
-        setIsArduinoConnected(false);
-        setIsConnecting(false);
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (!data.success) {
-            console.error('Arduino command error:', data.error);
+        // Listen for connection response
+        const handleMessage = (event: MessageEvent) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.action === 'connect' && data.motor === motorNumber) {
+              if (data.success) {
+                setIsArduinoConnected(true);
+                setIsConnecting(false);
+                toast.success(`Motor ${motorNumber} connected on ${portDevice}`);
+                // Notify parent with position
+                onPositionChange?.(position);
+              } else {
+                setIsArduinoConnected(false);
+                setIsConnecting(false);
+                setSelectedPort(undefined);
+                toast.error(data.error || `Failed to connect motor ${motorNumber}`);
+              }
+              wsRef.current?.removeEventListener('message', handleMessage);
+            }
+          } catch (error) {
+            console.error('Error parsing WebSocket message:', error);
           }
-        } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
-        }
-      };
+        };
+
+        wsRef.current.addEventListener('message', handleMessage);
+
+        // Timeout after 5 seconds
+        setTimeout(() => {
+          if (isConnecting) {
+            setIsConnecting(false);
+            setSelectedPort(undefined);
+            toast.error('Connection timeout');
+            wsRef.current?.removeEventListener('message', handleMessage);
+          }
+        }, 5000);
+      } else {
+        throw new Error('WebSocket not connected');
+      }
     } catch (error) {
-      console.error('Error creating WebSocket:', error);
+      console.error('Error connecting to Arduino:', error);
       setIsConnecting(false);
       setSelectedPort(undefined);
       toast.error(`Failed to connect to Arduino on ${portDevice}`);
@@ -101,7 +108,11 @@ export const MotorCard = ({ motorNumber, onPositionChange }: MotorCardProps) => 
 
   const sendCommand = (command: 'f' | 'b') => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({ command }));
+      wsRef.current.send(JSON.stringify({
+        action: 'command',
+        motor: motorNumber,
+        command
+      }));
     }
   };
 
@@ -211,7 +222,7 @@ export const MotorCard = ({ motorNumber, onPositionChange }: MotorCardProps) => 
             className="flex-1"
             variant="default"
           >
-            <ArrowUp className="w-4 h-4 mr-2" />
+            <ArrowDown className="w-4 h-4 mr-2" />
             Forward
           </Button>
           <Button
@@ -224,7 +235,7 @@ export const MotorCard = ({ motorNumber, onPositionChange }: MotorCardProps) => 
             className="flex-1"
             variant="default"
           >
-            <ArrowDown className="w-4 h-4 mr-2" />
+            <ArrowUp className="w-4 h-4 mr-2" />
             Backward
           </Button>
         </div>

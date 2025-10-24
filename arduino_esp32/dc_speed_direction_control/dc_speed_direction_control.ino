@@ -68,7 +68,8 @@ void setup() {
           analogWrite(RPWM_PIN, 0);
           analogWrite(LPWM_PIN, manualSpeedPWM);
         }
-        // Don't process further - continue waiting for motor selection
+        int potValue = analogRead(POT_PIN);
+        Serial.println("POT: " + String(potValue));
       }
       // Check if it's a digit (motor selection)
       else if (firstChar == '0' || firstChar == '1') {

@@ -1,27 +1,75 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Play, Square, Activity } from "lucide-react";
 import { MotorCard } from "@/components/MotorCard";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9000';
+
 const Index = () => {
   const [isListening, setIsListening] = useState(false);
   const [motor1Position, setMotor1Position] = useState<"left" | "right" | undefined>();
   const [motor2Position, setMotor2Position] = useState<"left" | "right" | undefined>();
+  const wsRef = useRef<WebSocket | null>(null);
+
+  // Create WebSocket connection on mount
+  useEffect(() => {
+    const wsUrl = API_BASE_URL.replace(/^http/, 'ws');
+    const ws = new WebSocket(`${wsUrl}/ws/arduino/`);
+    wsRef.current = ws;
+
+    ws.onopen = () => {
+      console.log('WebSocket connected');
+    };
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      toast.error('Failed to connect to Arduino WebSocket');
+    };
+
+    ws.onclose = () => {
+      console.log('WebSocket disconnected');
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        console.log('WebSocket message:', data);
+
+        // Handle start action response
+        console.log("here i m" , data);
+        if (data.action === 'start') {
+          if (data.success) {
+            setIsListening(true);
+            toast.success(data.message || 'Physics monitoring started');
+          } else {
+            setIsListening(false);
+            toast.error(data.error || 'Failed to start listening');
+          }
+        }
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
+      }
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, []);
 
   const handleStartListening = () => {
-    if (!motor1Position || !motor2Position) {
-      toast.error("Please configure both motors before starting");
-      return;
+    if (!isListening) {
+      // Send start message via WebSocket
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ action: 'start' }));
+        // Wait for server response to set isListening
+      } else {
+        toast.error("WebSocket not connected");
+      }
+    } else {
+      setIsListening(false);
+      toast.success("Stopped listening to movements");
     }
-
-    if (motor1Position === motor2Position) {
-      toast.error("Motors cannot be assigned to the same position");
-      return;
-    }
-
-    setIsListening(!isListening);
-    toast.success(isListening ? "Stopped listening to movements" : "Started listening to movements");
   };
 
   return (
@@ -40,8 +88,8 @@ const Index = () => {
 
         {/* Motor Cards Grid */}
         <div className="grid md:grid-cols-2 gap-6">
-          <MotorCard motorNumber={0} onPositionChange={setMotor1Position} />
-          <MotorCard motorNumber={1} onPositionChange={setMotor2Position} />
+          <MotorCard motorNumber={0} position="left" onPositionChange={setMotor1Position} wsRef={wsRef} />
+          <MotorCard motorNumber={1} position="right" onPositionChange={setMotor2Position} wsRef={wsRef} />
         </div>
 
         {/* Main Control Panel */}
