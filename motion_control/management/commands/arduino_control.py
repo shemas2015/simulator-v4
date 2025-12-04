@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand, CommandError
 from motion_control.arduino_controller import ArduinoController
-from motion_control.assetto_physics import AssettoPhysics
+from motion_control.games.assetto_physics import AssettoPhysics
 import threading
 import time
 import logging
@@ -45,7 +45,7 @@ class Command(BaseCommand):
                 else:
                     self.logger.info('  No Arduino/USB Serial devices found')
                 return
-            
+
 
             # Create Arduino controller with specified options
             arduino = ArduinoController(
@@ -55,7 +55,7 @@ class Command(BaseCommand):
 
             self.logger.info('Connecting to Assetto Corsa...')
             ac_physics = AssettoPhysics(arduino_controller=arduino)
-            
+
             # Check Arduino connection status (already attempted in constructor)
             if not arduino._is_connected:
                 self.logger.error(f"Failed to connect to Arduino on port {options['port']}")
@@ -69,24 +69,24 @@ class Command(BaseCommand):
             )
             gear_thread.start()
             self.logger.info('Gear change monitoring started in background')
-            
+
             # TODO: Add other physics event checks here before starting main functionality
             # Example: Check for specific conditions, initialize other systems, etc.
             self.logger.warning('Ready for additional physics event checks...')
-            
+
             # Keep main thread alive to allow background monitoring
             try:
                 while True:
                     time.sleep(1)  # Keep main thread running
-                    
+
             except KeyboardInterrupt:
                 self.logger.info('Shutting down...')
 
             # Commented Arduino code (keep for later use)
-            
+
 
         except Exception as e:
             raise CommandError(f'Command failed: {e}')
-        
+
         finally:
             pass

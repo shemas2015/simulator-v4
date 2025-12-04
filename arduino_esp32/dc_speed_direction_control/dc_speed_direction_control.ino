@@ -15,6 +15,10 @@ bool parametersSet = false; // Flag to track if parameters have been set
 int selectedMotor = -1;     // Motor selection: 0=left, 1=right, -1=not set
 int manualSpeedPWM = 150;   // Speed for manual control during motor selection
 
+// Potentiometer calibration range
+const int POT_MIN = 1200;   // Minimum potentiometer value
+const int POT_MAX = 2800;   // Maximum potentiometer value
+
 // Global variables for potentiometer reading (shared between tasks)
 volatile float currentAngle = 0.0;
 
@@ -207,14 +211,14 @@ void positionMotor( int speed) {
 void potentiometerTask(void *parameter) {
   while (true) {
     
-    // Read potentiometer value (0-4095) and convert to angle (0-180)
+    // Read potentiometer value and convert to angle (0-180)
     int potValue = analogRead(POT_PIN);
 
     if(selectedMotor == 1){
-      currentAngle = map(potValue, 0, 4095, 0, 180);
+      currentAngle = map(potValue, POT_MIN, POT_MAX, 0, 180);
     }
     else if(selectedMotor == 0){
-      currentAngle = map(potValue, 4095, 0, 0, 180);
+      currentAngle = map(potValue, POT_MAX, POT_MIN, 0, 180);
     }
 
     /*

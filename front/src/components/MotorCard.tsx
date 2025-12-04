@@ -24,6 +24,7 @@ export const MotorCard = ({ motorNumber, position, onPositionChange, wsRef }: Mo
   const [selectedPort, setSelectedPort] = useState<string | undefined>(undefined);
   const [isArduinoConnected, setIsArduinoConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [potValue, setPotValue] = useState<string | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Use real-time connection data from backend or local selection
@@ -113,6 +114,23 @@ export const MotorCard = ({ motorNumber, position, onPositionChange, wsRef }: Mo
         motor: motorNumber,
         command
       }));
+
+      // Listen for command response with POT value
+      const handleCommandResponse = (event: MessageEvent) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.action === 'command' && data.motor === motorNumber && data.result?.pot_value) {
+            setPotValue(data.result.pot_value);
+          }
+        } catch (error) {
+          console.error('Error parsing command response:', error);
+        }
+      };
+
+      wsRef.current.addEventListener('message', handleCommandResponse);
+      setTimeout(() => {
+        wsRef.current?.removeEventListener('message', handleCommandResponse);
+      }, 1000);
     }
   };
 
@@ -261,6 +279,16 @@ export const MotorCard = ({ motorNumber, position, onPositionChange, wsRef }: Mo
               : "Awaiting connection"}
           </span>
         </div>
+
+        {/* POT Value Display */}
+        {potValue && (
+          <div className="p-3 rounded-lg border-2 border-blue-500/50 bg-blue-500/10">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-muted-foreground">POT Value:</span>
+              <span className="text-lg font-bold text-blue-500">{potValue}</span>
+            </div>
+          </div>
+        )}
       </div>
     </Card>
   );

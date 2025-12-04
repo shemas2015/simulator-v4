@@ -130,3 +130,14 @@ The system is designed to work with:
 - MPU (Motion Processing Unit) sensors
 - Potentiometer-based rotation detection
 - Serial communication for motor control commands
+
+## DCS World Integration
+
+To use the motion platform with DCS World:
+
+1. **Configure Export.lua** - Create the file `%USERPROFILE%\Saved Games\DCS\Scripts\Export.lua` with the telemetry export code
+2. **Restart DCS World** - Required for the Export.lua to take effect
+3. **Run telemetry script** - Execute `python dcs_telemetry.py` to monitor pitch/roll data
+4. **Start flying** - Telemetry only works when actively flying in a mission
+
+For detailed setup instructions, see [doc/dcs_telemetry_setup.md](doc/dcs_telemetry_setup.md)

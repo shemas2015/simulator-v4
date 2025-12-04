@@ -124,16 +124,7 @@ class ArduinoController:
             command = f"{speed},{angle}\n"
             self.connection.write(command.encode())
             
-            """
-            if verbose:
-                logger.info(f"Sent command: Speed={speed}, Angle={angle}")
-                print(f"✓ Sent command: Speed={speed}, Angle={angle}")
-            
-            # Try to read response from Arduino
-            response = self.read_response()
-            if response and verbose:
-                print(f"Arduino response: {response}")
-            """
+
             
             return True
             
@@ -143,13 +134,13 @@ class ArduinoController:
                 print(f"✗ Error sending command: {e}")
             return False
 
-    def read_response(self, timeout: Optional[float] = None) -> Optional[str]:
+    def __read_response(self) -> Optional[str]:
         """
-        Read response from Arduino.
-        
+        Private method to read response from Arduino.
+
         Args:
             timeout: Read timeout in seconds. If None, uses default
-            
+
         Returns:
             Response string or None if no response/error
         """
@@ -157,29 +148,16 @@ class ArduinoController:
             return None
 
         try:
-            old_timeout = self.connection.timeout
-            if timeout is not None:
-                self.connection.timeout = timeout
-            
-            time.sleep(0.1)  # Give Arduino time to respond
-            
-            if self.connection.in_waiting > 0:
-                try:
-                    response = self.connection.readline().decode('utf-8', errors='ignore').strip()
-                    return response if response else None
-                except Exception:
-                    # If decoding fails, try reading raw bytes
-                    raw_response = self.connection.readline()
-                    return f"Raw: {raw_response}"
-            
-            return None
-            
+            time.sleep(0.2)
+            lines = []
+            while self.connection.in_waiting > 0:
+                line = self.connection.readline().decode('utf-8', errors='ignore').strip()
+                if line:
+                    lines.append(line)
+            return '\n'.join(lines) if lines else None
         except Exception as e:
             logger.error(f"Error reading response: {e}")
             return None
-        finally:
-            if timeout is not None:
-                self.connection.timeout = old_timeout
 
     def set_motor_number(self,motor_num:int):
         self.motor_number = motor_num
@@ -359,10 +337,17 @@ class ArduinoController:
             logger.error(f"Invalid command: {command}. Must be 'f' or 'b'")
             return False
 
+        pot_value = None
         try:
             self.connection.write(command.encode())
+            response = self.__read_response()
+            if response:
+                for line in response.split('\n'):
+                    if "POT:" in line:
+                        pot_value = line.split("POT:")[-1].strip()
+                        break
             logger.info(f"Sent manual command '{command}' ({'forward' if command == 'f' else 'backward'})")
-            return True
+            return {"pot_value":pot_value}
 
         except Exception as e:
             logger.error(f"Error sending manual command: {e}")

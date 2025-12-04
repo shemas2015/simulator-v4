@@ -5,7 +5,7 @@ import threading
 import os
 from channels.generic.websocket import WebsocketConsumer, AsyncWebsocketConsumer
 from motion_control.arduino_controller import ArduinoController
-from motion_control.assetto_physics import AssettoPhysics
+from motion_control.games.DCS_world import DcsWorldTelemetry
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ class ArduinoControlConsumer(WebsocketConsumer):
     def connect(self):
         """Accept WebSocket connection."""
         self.motors = {}  # Store motor instances: {0: left, 1: right}
-        self.ac_physics = None  # Assetto Corsa physics instance
+        self.simulator = None  # Assetto Corsa physics instance
         self.monitoring_thread = None  # Background monitoring thread
         self.accept()
         logger.info("WebSocket connected, awaiting motor configuration")
@@ -90,14 +90,15 @@ class ArduinoControlConsumer(WebsocketConsumer):
                     }))
                     return
 
-                success = self.motors[motor].send_manual_command(command)
+                result = self.motors[motor].send_manual_command(command)
 
-                if success:
+                if result:
                     self.send(text_data=json.dumps({
                         'success': True,
                         'action': 'command',
                         'motor': motor,
-                        'command': command
+                        'command': command,
+                        'result': result
                     }))
                 else:
                     self.send(text_data=json.dumps({
@@ -147,18 +148,14 @@ class ArduinoControlConsumer(WebsocketConsumer):
                         }))
                         return
 
-                
-                # Get primary motor controller (use motor 1 if available, else first available)
-                primary_motor = self.motors[1]
-                primary_motor.send_command(200,90)
 
 
                 # Create physics instance with primary motor
-                self.ac_physics = AssettoPhysics(arduino_controller=primary_motor)
+                self.simulator = DcsWorldTelemetry(self.motors)
 
                 # Start monitoring in background thread
                 self.monitoring_thread = threading.Thread(
-                    target=self.ac_physics.start_monitoring,
+                    target=self.simulator.start_monitoring,
                     daemon=True
                 )
                 self.monitoring_thread.start()
@@ -169,7 +166,7 @@ class ArduinoControlConsumer(WebsocketConsumer):
                     'message': 'Physics monitoring started'
                 }))
                 logger.info('Assetto Corsa physics monitoring started')
-                
+
 
             else:
                 self.send(text_data=json.dumps({
