@@ -13,11 +13,15 @@ int inputSpeed = 0;         // No default speed
 float targetAngle = 0.0;    // No default target angle
 bool parametersSet = false; // Flag to track if parameters have been set
 int selectedMotor = -1;     // Motor selection: 0=left, 1=right, -1=not set
-int manualSpeedPWM = 150;   // Speed for manual control during motor selection
+int manualSpeedPWM = 100;   // Speed for manual control during motor selection
 
-// Potentiometer calibration range
-const int POT_MIN = 1200;   // Minimum potentiometer value
-const int POT_MAX = 2800;   // Maximum potentiometer value
+// Potentiometer calibration range per motor
+// Left motor (0):  0° = 3986, 180° = 1300
+const int POT_LEFT_0   = 3986;
+const int POT_LEFT_180 = 1300;
+// Right motor (1): 0° = 64,   180° = 2751
+const int POT_RIGHT_0   = 64;
+const int POT_RIGHT_180 = 2751;
 
 // Global variables for potentiometer reading (shared between tasks)
 volatile float currentAngle = 0.0;
@@ -123,6 +127,14 @@ void setup() {
 
 void loop() {
 
+  // Check for reset command
+  if (Serial.available() > 0 && Serial.peek() == 'r') {
+    Serial.read();
+    Serial.println("Restarting...");
+    delay(100);
+    ESP.restart();
+  }
+
   // Check for serial input only if not currently moving
   if (Serial.available() > 0 && !parametersSet) {
     String input = Serial.readStringUntil('\n');
@@ -215,10 +227,10 @@ void potentiometerTask(void *parameter) {
     int potValue = analogRead(POT_PIN);
 
     if(selectedMotor == 1){
-      currentAngle = map(potValue, POT_MIN, POT_MAX, 0, 180);
+      currentAngle = map(potValue, POT_RIGHT_0, POT_RIGHT_180, 0, 180);
     }
     else if(selectedMotor == 0){
-      currentAngle = map(potValue, POT_MAX, POT_MIN, 0, 180);
+      currentAngle = map(potValue, POT_LEFT_0, POT_LEFT_180, 0, 180);
     }
 
     /*

@@ -131,6 +131,34 @@ The system is designed to work with:
 - Potentiometer-based rotation detection
 - Serial communication for motor control commands
 
+## Potentiometer Calibration
+
+Each motor has its own potentiometer that maps raw ADC readings (0–4095) to angles (0°–180°).
+Because the motors are mounted mirrored, the pot travels in opposite directions.
+
+> **IMPORTANT — Safety warnings:**
+> - **Disconnect the physical arms/structure from the motors before calibrating.** During this process the motors move freely and uncontrolled movement with the structure attached can cause mechanical damage or injury.
+> - **Repeat this calibration every time the potentiometer is repositioned or re-mounted.** If the potentiometer moves even slightly on its shaft, the angle mapping will be wrong and the system will not position correctly.
+
+The calibration constants are defined in `arduino_esp32/dc_speed_direction_control/dc_speed_direction_control.ino`:
+
+| Constant | Motor | Position |
+|---|---|---|
+| `POT_LEFT_0` | Left (0) | 0° |
+| `POT_LEFT_180` | Left (0) | 180° |
+| `POT_RIGHT_0` | Right (1) | 0° |
+| `POT_RIGHT_180` | Right (1) | 180° |
+
+> The raw ADC values for each constant depend on your specific hardware and potentiometer mounting. They must be measured on your setup — do not use values from another unit.
+
+**How to recalibrate:**
+1. **Disconnect the arms/structure** from both motors
+2. Run the application and open the frontend
+3. Use the **Forward** / **Backward** buttons on each motor card to jog the motor manually
+4. Move the motor to the 0° physical position and read the **POT Value** shown in the motor card
+5. Move the motor to the 180° physical position and read the **POT Value**
+6. Update the four constants above in the `.ino` file with the measured values and re-flash
+
 ## DCS World Integration
 
 To use the motion platform with DCS World:

@@ -11,6 +11,25 @@ const Index = () => {
   const [motor1Position, setMotor1Position] = useState<"left" | "right" | undefined>();
   const [motor2Position, setMotor2Position] = useState<"left" | "right" | undefined>();
   const wsRef = useRef<WebSocket | null>(null);
+  const isListeningRef = useRef(false);
+
+  // Keep ref in sync so beforeunload handler always sees current value
+  useEffect(() => {
+    isListeningRef.current = isListening;
+  }, [isListening]);
+
+  // Send restart command before tab close or page reload when listening is active
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (isListeningRef.current) {
+        [0, 1].forEach(motor =>
+          wsRef.current?.send(JSON.stringify({ action: 'command', command: 'r', motor }))
+        );
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
 
   // Create WebSocket connection on mount
   useEffect(() => {
@@ -67,8 +86,12 @@ const Index = () => {
         toast.error("WebSocket not connected");
       }
     } else {
+      [0, 1].forEach(motor =>
+        wsRef.current?.send(JSON.stringify({ action: 'command', command: 'r', motor }))
+      ); // Send restart command to both motors to be available again for forward/backward commands
       setIsListening(false);
       toast.success("Stopped listening to movements");
+      window.location.reload();
     }
   };
 
