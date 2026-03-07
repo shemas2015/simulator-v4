@@ -148,7 +148,7 @@ class ArduinoController:
             return None
 
         try:
-            time.sleep(0.2)
+            time.sleep(0.1)
             lines = []
             while self.connection.in_waiting > 0:
                 line = self.connection.readline().decode('utf-8', errors='ignore').strip()
@@ -333,8 +333,8 @@ class ArduinoController:
             logger.error("No active connection to Arduino")
             return False
 
-        if command not in ['f', 'b']:
-            logger.error(f"Invalid command: {command}. Must be 'f' or 'b'")
+        if command not in ['f', 'b', 'r']:
+            logger.error(f"Invalid command: {command}. Must be 'f','b' or 'r' ")
             return False
 
         pot_value = None
