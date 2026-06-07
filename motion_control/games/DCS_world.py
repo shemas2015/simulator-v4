@@ -28,6 +28,7 @@ class DcsWorldTelemetry:
             'output_min': -0.20,  # Minimum platform displacement in meters
             'output_max': 0.20,  # Maximum platform displacement in meters
             'scale_factor': 90 / 0.25,  # Degrees per meter (90° rotation / 0.25m max height)
+            'motor_speed': 160,  # Motor speed (0-255)
         }
 
 
@@ -106,8 +107,9 @@ class DcsWorldTelemetry:
 
                             # Send commands to motors
                         
-                            self.motors[1].send_command(speed=100, angle=int(right_angle), verbose=False)
-                            self.motors[0].send_command(speed=100, angle=int(left_angle), verbose=False)
+                            speed = self.config['motor_speed']
+                            self.motors[1].send_command(speed=speed, angle=int(right_angle), verbose=False)
+                            self.motors[0].send_command(speed=speed, angle=int(left_angle), verbose=False)
 
 
 

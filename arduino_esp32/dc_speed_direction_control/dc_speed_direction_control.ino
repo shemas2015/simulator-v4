@@ -135,8 +135,8 @@ void loop() {
     ESP.restart();
   }
 
-  // Check for serial input only if not currently moving
-  if (Serial.available() > 0 && !parametersSet) {
+  // Check for serial input — updates target even while moving
+  if (Serial.available() > 0) {
     String input = Serial.readStringUntil('\n');
     input.trim();
 
